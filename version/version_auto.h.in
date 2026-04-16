@@ -1,21 +1,104 @@
-#ifndef __VERSION_AUTO_H__
-#define __VERSION_AUTO_H__
+/*
+ * version_auto.h
+ *
+ * !! 自动生成文件 —— 禁止手动编辑 !!
+ *
+ * 本文件由 CMake configure_file() 在每次构建时根据 version_auto.h.in
+ * 模板自动生成，任何手动修改将在下次构建时被无条件覆盖。
+ *
+ * 源模板  : version/version_auto.h.in
+ * 生成位置: <build_dir>/version/version_auto.h
+ */
 
-#define SDK_VERSION_MAJOR        @SDK_VERSION_MAJOR@
-#define SDK_VERSION_MINOR        @SDK_VERSION_MINOR@
-#define SDK_VERSION_PATCH        @SDK_VERSION_PATCH@
+#ifndef SDK_VERSION_AUTO_H
+#define SDK_VERSION_AUTO_H
 
-#define SDK_VERSION_STR          "V@SDK_VERSION_MAJOR@.@SDK_VERSION_MINOR@.@SDK_VERSION_PATCH@-@SDK_BUILD_TYPE@+@BUILD_DATE@.@GIT_SHORT_HASH@"
-#define SDK_VERSION_CODE         @VERSION_CODE@
+/* ── 版本三元组（整数，可直接用于 #if 编译期比较） ───────────────────────── */
+#define SDK_VERSION_MAJOR     @SDK_VERSION_MAJOR@
+#define SDK_VERSION_MINOR     @SDK_VERSION_MINOR@
+#define SDK_VERSION_PATCH     @SDK_VERSION_PATCH@
 
-#define SDK_GIT_HASH             "@GIT_HASH@"
-#define SDK_GIT_SHORT_HASH       "@GIT_SHORT_HASH@"
-#define SDK_GIT_BRANCH           "@GIT_BRANCH@"
+/*
+ * 数字版本码：0xMMIIPP
+ *   高 8 位 = MAJOR，中 8 位 = MINOR，低 8 位 = PATCH
+ *
+ * 用途示例：
+ *   OTA 降级保护  : if (current_code < MINIMUM_CODE) { reject(); }
+ *   编译期兼容守卫: #if SDK_VERSION_CODE >= 0x010200
+ */
+#define SDK_VERSION_CODE      (@SDK_VERSION_CODE_DEC@U)
 
-#define SDK_BUILD_DATE           "@BUILD_DATE@"
-#define SDK_BUILD_TIME           "@BUILD_TIME@"
-#define SDK_COMPILER_VERSION     "@CMAKE_C_COMPILER_VERSION@"
-#define SDK_HW_PLATFORM          "@SDK_HW_PLATFORM@"
-#define SDK_BUILD_TYPE           "@SDK_BUILD_TYPE@"
+/* ── 版本字符串（semver 2.0，无 'V' 前缀） ───────────────────────────────── */
+#define SDK_VERSION_STRING    "@SDK_VERSION_STRING@"
 
+/* 完整上电横幅（含产品名、HW 兼容范围（若配置）、Git Hash） */
+#define SDK_VERSION_BANNER    "@SDK_VERSION_BANNER@"
+
+/* ── 产品标识 ─────────────────────────────────────────────────────────────── */
+#define SDK_PRODUCT_NAME      "@SDK_PRODUCT_NAME@"
+
+/* ── Git 溯源信息 ─────────────────────────────────────────────────────────── */
+#define SDK_GIT_HASH_FULL     "@GIT_HASH_FULL@"
+#define SDK_GIT_HASH_SHORT    "@GIT_HASH_SHORT@"
+#define SDK_GIT_BRANCH        "@GIT_BRANCH@"
+
+/*
+ * 工作区洁净度标志
+ *   "CLEAN"   : 无未提交修改，版本可精确回溯，适用于正式发布
+ *   "DIRTY"   : 存在未提交修改，版本字符串已附加 +dirty 后缀
+ *   "UNKNOWN" : 非 Git 环境（离线构建 / 源码压缩包解压），所有 Hash 为占位符
+ */
+#define SDK_GIT_DIRTY_FLAG    "@GIT_DIRTY_FLAG@"
+
+/* ── 构建元数据 ───────────────────────────────────────────────────────────── */
+#define SDK_BUILD_TIMESTAMP   "@BUILD_TIMESTAMP_UTC@"   /* UTC, YYYYMMDDTHHMMSSz */
+#define SDK_BUILD_DATE        "@BUILD_DATE_STR@"        /* YYYYMMDD              */
+#define SDK_TOOLCHAIN_VER     "@SDK_TOOLCHAIN_VER@"
+
+/* ── 发布通道与硬件 / 平台兼容性（嵌入式场景） ───────────────────────────── */
+#define SDK_CHANNEL           "@SDK_CHANNEL@"
+#define SDK_HW_COMPAT_MIN     "@SDK_HW_COMPAT_MIN@"
+#define SDK_HW_COMPAT_MAX     "@SDK_HW_COMPAT_MAX@"
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  实用宏
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * SDK_VERSION_AT_LEAST(major, minor, patch)
+ *
+ * 在集成方代码中做编译期版本守卫，防止低版本 SDK 调用高版本 API。
+ *
+ * 用法：
+ *   #if SDK_VERSION_AT_LEAST(1, 2, 0)
+ *       some_new_api();   // 仅 >= 1.2.0 才编译
+ *   #else
+ *       legacy_api();
+ *   #endif
+ */
+#define SDK_VERSION_AT_LEAST(maj, min, pat) \
+    (SDK_VERSION_CODE >= (((maj) << 16U) | ((min) << 8U) | (unsigned int)(pat)))
+
+/*
+ * SDK_ASSERT_CLEAN_BUILD
+ *
+ * 在对洁净度敏感的源文件顶部（#include 之后）插入此宏，
+ * 可在编译阶段强制确保该文件只在洁净工作区下参与 MP Release 构建。
+ *
+ * 用法：在 .c 文件中加一行
+ *   SDK_ASSERT_CLEAN_BUILD;
+ *
+ * C11 及以上：_Static_assert 在编译期报错，提示明确。
+ * C99 及以下：宏为空，洁净度由 CMake 层的 FATAL_ERROR 保障。
+ */
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+#  define SDK_ASSERT_CLEAN_BUILD \
+     _Static_assert( \
+         SDK_GIT_DIRTY_FLAG[0] == 'C', \
+         "MP Release 构建检测到脏工作区，请提交或暂存所有修改后重新构建。" \
+     )
+#else
+#  define SDK_ASSERT_CLEAN_BUILD  /* C99: 由 CMake FATAL_ERROR 层保障 */
 #endif
+
+#endif /* SDK_VERSION_AUTO_H */
