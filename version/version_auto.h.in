@@ -67,17 +67,26 @@
 /*
  * SDK_VERSION_AT_LEAST(major, minor, patch)
  *
- * 在集成方代码中做编译期版本守卫，防止低版本 SDK 调用高版本 API。
+ * 用于运行时条件判断（if / assert 语句）。
  *
  * 用法：
- *   #if SDK_VERSION_AT_LEAST(1, 2, 0)
- *       some_new_api();   // 仅 >= 1.2.0 才编译
- *   #else
- *       legacy_api();
- *   #endif
+ *   if (SDK_VERSION_AT_LEAST(1, 2, 0)) { use_new_api(); }
  */
 #define SDK_VERSION_AT_LEAST(maj, min, pat) \
-    (SDK_VERSION_CODE >= (((maj) << 16U) | ((min) << 8U) | (unsigned int)(pat)))
+    (SDK_VERSION_CODE >= ((uint32_t)((maj) * 65536U + (min) * 256U + (pat))))
+
+/*
+ * SDK_VERSION_IF(major, minor, patch)
+ *
+ * 用于预处理器 #if 编译期条件编译（不含类型转换，符合 #if 语法限制）。
+ *
+ * 用法：
+ *   #if SDK_VERSION_IF(1, 2, 0)
+ *       // SDK >= 1.2.0 才编译此段
+ *   #endif
+ */
+#define SDK_VERSION_IF(maj, min, pat) \
+    (SDK_VERSION_CODE >= ((maj) * 65536 + (min) * 256 + (pat)))
 
 /*
  * SDK_ASSERT_CLEAN_BUILD
@@ -92,11 +101,15 @@
  * C99 及以下：宏为空，洁净度由 CMake 层的 FATAL_ERROR 保障。
  */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+/*
+ * 用法：SDK_ASSERT_CLEAN_BUILD;
+ * 包裹在 do{}while(0) 中以消除文件作用域的多余分号警告（-Wpedantic）。
+ * 但 _Static_assert 只在函数外有效，故此处改为 typedef 形式。
+ */
 #  define SDK_ASSERT_CLEAN_BUILD \
-     _Static_assert( \
-         SDK_GIT_DIRTY_FLAG[0] == 'C', \
-         "MP Release 构建检测到脏工作区，请提交或暂存所有修改后重新构建。" \
-     )
+     typedef char _sdk_clean_build_check[ \
+         (SDK_GIT_DIRTY_FLAG[0] == 'C') ? 1 : -1 \
+     ]
 #else
 #  define SDK_ASSERT_CLEAN_BUILD  /* C99: 由 CMake FATAL_ERROR 层保障 */
 #endif
